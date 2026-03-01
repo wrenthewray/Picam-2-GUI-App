@@ -1,0 +1,14 @@
+#:kivy 1.0.9
+
+<PicamWidget>:
+    BoxLayout:
+        orientation: 'vertical'
+        Image:
+            id: preview
+            pos_hint: {'x':0.0, 'y':0.2}
+            size_hint: 1.0, 0.8
+        Button:
+            text: 'Capture'
+            size_hint_y: None
+            height: '48dp'
+            on_press: root.capture()
