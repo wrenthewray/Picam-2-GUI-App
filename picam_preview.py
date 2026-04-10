@@ -3,29 +3,24 @@ import threading
 from time import sleep
 from kivy.clock import Clock
 from kivy.graphics.texture import Texture
-from picam import Picam
 
-PICAM = Picam();
-
-SIXTY_FPS = 1 / 60;
-FIFTY_NINE_POINT_NINE_FOUR_FPS = 1 / 59.94;
-FOURTY_EIGHT_FPS = 1 / 48;
-THIRTY_FPS = 1 / 30;
-TWENTY_FIVE_FPS = 1 / 25;
-TWENTY_FOUR_FPS = 1 / 24;
-TWELVE_FPS = 1 / 12;
+from constants import FrameRate
 
 class PicamPreview():
-    PREVIEW_UPDATE_FRAME_RATE = SIXTY_FPS;
+    PICAM_CONTROL = None;
+    PREVIEW_UPDATE_FRAME_RATE = FrameRate.TWELVE_FPS;
     allow_preview = True
     frame = None
 
+    def __init__(self, picam_control):
+        self.PICAM_CONTROL = picam_control;
+    
     def GetPicamFrame(self, app):
         ''' Grabs frames from the camera and schedules 
         them to be displayed in the Kivy app. '''
         while(self.allow_preview):
             sleep(self.PREVIEW_UPDATE_FRAME_RATE)
-            self.frame = PICAM.GetCurrentFrame()
+            self.frame = self.PICAM_CONTROL.GetCurrentFrame()
             Clock.schedule_once(partial(app.display_frame, self.frame))
 
     def CreateThread(self, app):
