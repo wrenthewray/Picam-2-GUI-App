@@ -1,13 +1,14 @@
 from PyQt5.QtWidgets import QApplication, QLabel
-from globals import Globals
-from picamera2.previews.qt import QGlPicamera2
+from picamera2 import Picamera2
+from picamera2.previews.qt import QGlPicamera2, QPicamera2
 
-GLOBALS = Globals();
+picam2 = Picamera2()
+picam2.configure(picam2.create_preview_configuration(main={"format": "RGB888", "size": (800, 600)}))
 
 app = QApplication([])
-qpicamera2 = QGlPicamera2(GLOBALS.PICAM2, width=800, height=600, keep_ar=False)
+qpicamera2 = QPicamera2(picam2, width=800, height=600, keep_ar=False)
 qpicamera2.setWindowTitle("Qt Picamera2 App")
 
-app = QApplication([])
+picam2.start()
 qpicamera2.show()
 app.exec()
