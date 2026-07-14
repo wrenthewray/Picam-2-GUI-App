@@ -1,4 +1,6 @@
-class AspectRatio():
+from enum import Enum
+
+class AspectRatioResolution():
     SIX_NINE_ASPECT_RATIO_4K = (3840, 2160);
     SIX_NINE_ASPECT_RATIO_QHD = (2560, 1440);
     SIX_NINE_ASPECT_RATIO_HD = (1920, 1080);
@@ -14,7 +16,10 @@ class AspectRatio():
     FOUR_THREE_ASPECT_RATIO_XGA = (1024, 768);
     FOUR_THREE_ASPECT_RATIO_SVGA = (800, 600);
     FOUR_THREE_ASPECT_RATIO_VGA = (640, 480);
-
+class AspectRatio(Enum):
+    SIX_BY_NINE = 0;
+    FOUR_BY_THREE = 1;
+    SQUARE = 2;
 class FrameRate():
     SIXTY_FPS = 1 / 60;
     FIFTY_NINE_POINT_NINE_FOUR_FPS = 1 / 59.94;
@@ -26,7 +31,16 @@ class FrameRate():
 class BitRate():
     FOURTY_FIVE_MBPS = 45 * 1000 * 1000;
     SIXTY_MBPS = 60 * 1000 * 1000;
-class ConfigType():
-    STILL = 0;
-    PREVIEW = 1;
-    VIDEO = 2;
+class CameraMode(Enum):
+    STILL = 0
+    VIDEO = 1
+    TIMELAPSE = 2
+class WhiteBalanceMode(Enum):
+    AUTO = 0
+    INCANDESCENT = 1
+    FLUORESCENT = 2
+    WARM_FLUORESCENT = 3
+    DAYLIGHT = 4
+    CLOUDY_DAYLIGHT = 5
+    TWILIGHT = 6
+    SHADE = 7
