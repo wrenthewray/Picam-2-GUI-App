@@ -1,11 +1,11 @@
 #!/usr/bin/python3
 
 from PyQt5 import QtCore
-from PyQt5.QtWidgets import QApplication, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget, QStackedLayout, QComboBox, QFileDialog
+from PyQt5.QtWidgets import QApplication, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget, QStackedLayout, QComboBox, QFileDialog, QTabWidget
 
 from picamera2 import Picamera2
 from picamera2.encoders import H264Encoder
-from picamera2.outputs import FileOutput
+from picamera2.outputs import FileOutput, FfmpegOutput
 from picamera2.previews.qt import QGlPicamera2
 
 from constants import *
@@ -20,6 +20,12 @@ try:
 except FileNotFoundError:
     prefs = Prefs()
 
+def is_int(obj):
+    return isinstance(obj, int)
+
+def is_tuple(obj):
+    return isinstance(obj, tuple) and len(obj) == 2 and all(isinstance(i, int) for i in obj)
+
 def post_callback(request):
     metadata.setText(''.join(f"{k}: {v}\n" for k, v in request.get_metadata().items()))
 
@@ -27,13 +33,13 @@ def get_still_file_path():
     return prefs.still_save_directory + f'/IMG_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.jpg'
 
 def get_video_file_path():
-    return prefs.video_save_directory + f'/VID_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.h264'
+    return prefs.video_save_directory + f'/VID_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.mp4'
 
 def on_record_button_clicked():
     global recording
     if not recording:
-        encoder = H264Encoder(10000000)
-        output = FileOutput(get_video_file_path())
+        encoder = H264Encoder(prefs.bitrate)
+        output = FfmpegOutput(get_video_file_path(), audio=prefs.audio_mode)
         picam2.start_encoder(encoder, output)
         record_button.setText("Stop recording")
         recording = True
@@ -79,17 +85,40 @@ def on_select_directory_button_clicked():
             prefs.still_save_directory = directory
     change_prefs(prefs)  # Save updated preferences to file
 
+def on_select_video_aspect_ratio(aspect_ratio: AspectRatio):
+    prefs.video_aspect_ratio = aspect_ratio
+    video_resolution_stacked_layout.setCurrentIndex(aspect_ratio.value)
+    prefs.video_resolution = list(SixteenNineResolution.__dict__.values())[0] if aspect_ratio == AspectRatio.SIXTEEN_BY_NINE else list(FourThreeResolution.__dict__.values())[0] if aspect_ratio == AspectRatio.FOUR_BY_THREE else list(OneOneResolution.__dict__.values())[0]
+    change_prefs(prefs)  # Save updated preferences to file
+
+def on_select_still_aspect_ratio(aspect_ratio: AspectRatio):
+    prefs.still_aspect_ratio = aspect_ratio
+    prefs.still_resolution = list(SixteenNineResolution.__dict__.values())[0] if aspect_ratio == AspectRatio.SIXTEEN_BY_NINE else list(FourThreeResolution.__dict__.values())[0] if aspect_ratio == AspectRatio.FOUR_BY_THREE else list(OneOneResolution.__dict__.values())[0]
+    change_prefs(prefs)  # Save updated preferences to file
+
 def on_close():
     picam2.stop()
     app.quit()
 
 app = QApplication([])
 
+bitrate_list = list(filter(is_int, list(BitRate.__dict__.values())))
+bitrate_list.pop(0) # Remove the first element of the list as its not one of the specified values
+frame_rate_list = list(filter(is_int, list(FrameRate.__dict__.values())))
+frame_rate_list.pop(0) # Remove the first element of the list as its not one of the specified values
+sixteen_nine_resolutions = list(filter(is_tuple, list(SixteenNineResolution.__dict__.values())))
+four_three_resolutions = list(filter(is_tuple, list(FourThreeResolution.__dict__.values())))
+one_one_resolutions = list(filter(is_tuple, list(OneOneResolution.__dict__.values())))
+
 metadata = QLabel()
 window = QWidget()
 recording_window = QWidget()
 capture_window = QWidget()
-options_window = QWidget()
+common_options_window = QWidget()
+autofocus_options_window = QWidget()
+video_options_window = QWidget()
+still_options_window = QWidget()
+options_tab_window = QTabWidget()
 stacked_layout = QStackedLayout()
 layout_h = QHBoxLayout()
 layout_v = QVBoxLayout()
@@ -115,7 +144,7 @@ capture_layout_v = QVBoxLayout()
 capture_layout_v.addWidget(capture_button)
 capture_window.setLayout(capture_layout_v)
 
-options_layout_v = QVBoxLayout()
+autofocus_options_layout_v = QVBoxLayout()
 
 autofocus_label = QLabel("Autofocus:")
 autofocus_combo = QComboBox()
@@ -148,10 +177,101 @@ autofocus_range_layout_h = QHBoxLayout()
 autofocus_range_layout_h.addWidget(autofocus_range_label)
 autofocus_range_layout_h.addWidget(autofocus_range_combo)
 
-options_layout_v.addLayout(autofocus_layout_h)
-options_layout_v.addLayout(autofocus_speed_layout_h)
-options_layout_v.addLayout(autofocus_range_layout_h)
-options_window.setLayout(options_layout_v)
+autofocus_options_layout_v.addLayout(autofocus_layout_h)
+autofocus_options_layout_v.addLayout(autofocus_speed_layout_h)
+autofocus_options_layout_v.addLayout(autofocus_range_layout_h)
+autofocus_options_window.setLayout(autofocus_options_layout_v)
+
+video_options_layout_v = QVBoxLayout()
+
+preview_frame_rate_label = QLabel("Preview Frame Rate:")
+preview_frame_rate_combo = QComboBox()
+preview_frame_rate_combo.addItem("12 FPS")
+preview_frame_rate_combo.addItem("24 FPS")
+preview_frame_rate_combo.addItem("25 FPS")
+preview_frame_rate_combo.addItem("30 FPS")
+preview_frame_rate_combo.setCurrentIndex(frame_rate_list.index(prefs.preview_frame_rate))
+preview_frame_rate_combo.currentIndexChanged.connect(lambda index: change_prefs(prefs, preview_frame_rate=frame_rate_list[index]))
+preview_frame_rate_layout_h = QHBoxLayout()
+preview_frame_rate_layout_h.addWidget(preview_frame_rate_label)
+preview_frame_rate_layout_h.addWidget(preview_frame_rate_combo)
+video_options_layout_v.addLayout(preview_frame_rate_layout_h)
+
+video_frame_rate_label = QLabel("Video Frame Rate:")
+video_frame_rate_combo = QComboBox()
+video_frame_rate_combo.addItem("12 FPS")
+video_frame_rate_combo.addItem("24 FPS")
+video_frame_rate_combo.addItem("25 FPS")
+video_frame_rate_combo.addItem("30 FPS")
+video_frame_rate_combo.setCurrentIndex(frame_rate_list.index(prefs.video_frame_rate))
+video_frame_rate_combo.currentIndexChanged.connect(lambda index: change_prefs(prefs, video_frame_rate=frame_rate_list[index]))
+video_frame_rate_layout_h = QHBoxLayout()
+video_frame_rate_layout_h.addWidget(video_frame_rate_label)
+video_frame_rate_layout_h.addWidget(video_frame_rate_combo)
+video_options_layout_v.addLayout(video_frame_rate_layout_h)
+
+video_bitrate_label = QLabel("Bitrate:")
+video_bitrate_combo = QComboBox()
+video_bitrate_combo.addItem("10.24 Mbps")
+video_bitrate_combo.addItem("20.48 Mbps")
+video_bitrate_combo.addItem("45 Mbps")
+video_bitrate_combo.addItem("60 Mbps")
+video_bitrate_combo.setCurrentIndex(bitrate_list.index(prefs.bitrate))
+video_bitrate_combo.currentIndexChanged.connect(lambda index: change_prefs(prefs, bitrate=bitrate_list[index]))
+video_bitrate_layout_h = QHBoxLayout()
+video_bitrate_layout_h.addWidget(video_bitrate_label)
+video_bitrate_layout_h.addWidget(video_bitrate_combo)
+video_options_layout_v.addLayout(video_bitrate_layout_h)
+
+video_aspect_ratio_label = QLabel("Aspect Ratio:")
+video_aspect_ratio_combo = QComboBox()
+video_aspect_ratio_combo.addItem("16:9")
+video_aspect_ratio_combo.addItem("4:3")
+video_aspect_ratio_combo.addItem("1:1")
+video_aspect_ratio_combo.setCurrentIndex(prefs.video_aspect_ratio.value)
+video_aspect_ratio_combo.currentIndexChanged.connect(lambda index: on_select_video_aspect_ratio(AspectRatio(index)))
+video_aspect_ratio_layout_h = QHBoxLayout()
+video_aspect_ratio_layout_h.addWidget(video_aspect_ratio_label)
+video_aspect_ratio_layout_h.addWidget(video_aspect_ratio_combo)
+video_options_layout_v.addLayout(video_aspect_ratio_layout_h)
+
+video_resolution_stacked_layout = QStackedLayout()
+video_resolution_combo_16_9 = QComboBox()
+video_resolution_combo_16_9.addItem("3840x2160 (4K)")
+video_resolution_combo_16_9.addItem("2560x1440 (QHD)")
+video_resolution_combo_16_9.addItem("1920x1080 (HD)")
+video_resolution_combo_16_9.addItem("1280x720 (SD)")
+video_resolution_combo_16_9.addItem("960x540 (qHD)")
+video_resolution_combo_16_9.setCurrentIndex(sixteen_nine_resolutions.index(prefs.video_resolution) if prefs.video_aspect_ratio == AspectRatio.SIXTEEN_BY_NINE and prefs.video_resolution in sixteen_nine_resolutions else 0)
+video_resolution_combo_16_9.currentIndexChanged.connect(lambda index: change_prefs(prefs, video_resolution=sixteen_nine_resolutions[index]))
+video_resolution_combo_4_3 = QComboBox()
+video_resolution_combo_4_3.addItem("3840x2880 (4K)")
+video_resolution_combo_4_3.addItem("3200x2400 (QUXGA)")
+video_resolution_combo_4_3.addItem("2048x1536 (QXGA)")
+video_resolution_combo_4_3.addItem("1600x1200 (UXGA)")
+video_resolution_combo_4_3.addItem("1280x960")
+video_resolution_combo_4_3.addItem("1024x768 (XGA)")
+video_resolution_combo_4_3.addItem("800x600 (SVGA)")
+video_resolution_combo_4_3.addItem("640x480 (VGA)")
+video_resolution_combo_4_3.setCurrentIndex(four_three_resolutions.index(prefs.video_resolution) if prefs.video_aspect_ratio == AspectRatio.FOUR_BY_THREE and prefs.video_resolution in four_three_resolutions else 0)
+video_resolution_combo_4_3.currentIndexChanged.connect(lambda index: change_prefs(prefs, video_resolution=four_three_resolutions[index]))
+video_resolution_combo_1_1 = QComboBox()
+video_resolution_combo_1_1.addItem("3840x3840 (4K)")
+video_resolution_combo_1_1.addItem("2560x2560 (QHD)")
+video_resolution_combo_1_1.addItem("1920x1920 (HD)")
+video_resolution_combo_1_1.addItem("1280x1280 (SD)")
+video_resolution_combo_1_1.addItem("960x960 (qHD)")
+video_resolution_combo_1_1.setCurrentIndex(one_one_resolutions.index(prefs.video_resolution) if prefs.video_aspect_ratio == AspectRatio.ONE_BY_ONE and prefs.video_resolution in one_one_resolutions else 0)
+video_resolution_combo_1_1.currentIndexChanged.connect(lambda index: change_prefs(prefs, video_resolution=one_one_resolutions[index]))
+video_resolution_stacked_layout.addWidget(video_resolution_combo_16_9)
+video_resolution_stacked_layout.addWidget(video_resolution_combo_4_3)
+video_resolution_stacked_layout.addWidget(video_resolution_combo_1_1)
+video_resolution_stacked_layout.setCurrentIndex(prefs.video_aspect_ratio.value)
+video_options_layout_v.addLayout(video_resolution_stacked_layout)
+video_options_window.setLayout(video_options_layout_v)
+
+options_tab_window.addTab(autofocus_options_window, "Autofocus")
+options_tab_window.addTab(video_options_window, "Video")
 
 switch_mode_button = QComboBox() 
 switch_mode_button.addItem("Stills")
@@ -182,11 +302,11 @@ layout_v.addLayout(stacked_layout)
 stacked_layout.addWidget(capture_window)  # Index 0 for Stills
 stacked_layout.addWidget(recording_window)   # Index 1 for Video
 stacked_layout.addWidget(QLabel("Timelapse mode not implemented yet"))  # Index 2 for Timelapse
-stacked_layout.addWidget(options_window)  # Index 3 for Options
+stacked_layout.addWidget(options_tab_window)  # Index 3 for Options
 stacked_layout.setCurrentIndex(prefs.camera_mode.value)  # Set initial mode based on prefs
 
-layout_h.addWidget(qpicamera2, 80)
-layout_h.addLayout(layout_v, 20)
+layout_h.addWidget(qpicamera2, 9)
+layout_h.addLayout(layout_v, 0)
 window.setLayout(layout_h)
 
 picam2.start()
