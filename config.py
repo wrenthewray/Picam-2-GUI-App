@@ -1,30 +1,40 @@
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QStackedLayout, QComboBox
 
-from constants import CameraMode
+from constants import CameraMode, SixteenNineResolution
 from preferences import Prefs
 from picamera2 import Picamera2
-from libcamera import controls
+from libcamera import controls, ColorSpace
 
 import pickle
 
 def change_camera_config(picam2: Picamera2, mode:CameraMode, prefs: Prefs):
+    picam2.stop()
     if mode == CameraMode.VIDEO:
-        picam2.configure(picam2.create_video_configuration(buffer_count=8, main={"size": prefs.video_resolution}, controls={"FrameRate": prefs.video_frame_rate}))
+        picam2.configure(picam2.create_video_configuration(
+            buffer_count=8, 
+            main={"size": prefs.video_resolution}, 
+            lores={"size": (640,480)},
+            controls={"FrameRate": prefs.video_frame_rate}, 
+            display="lores",
+            encode="main"
+        ))
     elif mode == CameraMode.STILL:
-        picam2.configure(picam2.create_preview_configuration(buffer_count=4, main={"size": prefs.still_resolution}, controls={"FrameRate": prefs.preview_frame_rate}))
+        picam2.configure(picam2.create_preview_configuration(
+            buffer_count=4, 
+            main={"size": (640,480)}, 
+            controls={"FrameRate": prefs.preview_frame_rate}
+        ))
+    picam2.start()
 
 def change_layout(stacked_layout : QStackedLayout, index: int):
     stacked_layout.setCurrentIndex(index)
 
-def change_controls(prefs: Prefs):
+def change_controls(picam2: Picamera2, prefs: Prefs):
+    picam2.stop()
     picam2.set_controls({
         "FrameRate": prefs.video_frame_rate if prefs.camera_mode == CameraMode.VIDEO else prefs.preview_frame_rate,
-        "BitRate": prefs.bitrate,
-        "AfMode": prefs.autofocus_mode, 
-        "Brightness": prefs.brightness, 
-        "Contrast": prefs.contrast, 
-        "Saturation": prefs.saturation
     })
+    picam2.start()
 
 def change_prefs(
     prefs: Prefs, 
@@ -34,9 +44,7 @@ def change_prefs(
     video_frame_rate: int = None,
     video_aspect_ratio: int = None,
     video_resolution: tuple = None,
-    autofocus: controls.AfModeEnum = None, 
-    autofocus_speed: controls.AfSpeedEnum = None, 
-    autofocus_range: controls.AfRangeEnum = None, 
+    camera_mode: CameraMode = None,
     audio_mode: bool = None, 
     bitrate: int = None,
     brightness: int = None, 
@@ -56,12 +64,8 @@ def change_prefs(
         prefs.video_aspect_ratio = video_aspect_ratio
     if video_resolution is not None:    
         prefs.video_resolution = video_resolution
-    if autofocus is not None:
-        prefs.autofocus_mode = autofocus
-    if autofocus_speed is not None:
-        prefs.autofocus_speed = autofocus_speed
-    if autofocus_range is not None:
-        prefs.autofocus_range = autofocus_range
+    if camera_mode is not None:
+        prefs.camera_mode = camera_mode
     if audio_mode is not None:
         prefs.audio_mode = audio_mode
     if bitrate is not None:
@@ -81,3 +85,4 @@ def change_prefs(
             pickle.dump(prefs, f)
     except Exception as e:
         print(f"Error saving preferences: {e}")
+    

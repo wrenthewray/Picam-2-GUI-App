@@ -14,11 +14,7 @@ class Prefs():
     auto_white_balance = False
     white_balance_mode = WhiteBalanceMode.AUTO
     camera_mode = CameraMode.VIDEO # Default to video mode
-
-    autofocus_mode = controls.AfModeEnum.Manual
-    autofocus_speed = controls.AfSpeedEnum.Normal
-    autofocus_range = controls.AfRangeEnum.Normal
-
+    
     audio_mode = False
     bitrate = BitRate.TWENTY_POINT_FOUR_MBPS
     brightness = 0
