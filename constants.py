@@ -1,4 +1,5 @@
 from enum import Enum
+from libcamera import controls
 
 class SixteenNineResolution():
     SIXTEEN_NINE_ASPECT_RATIO_4K = (3840, 2160)
@@ -41,10 +42,9 @@ class CameraMode(Enum):
     TIMELAPSE = 2
 class WhiteBalanceMode(Enum):
     AUTO = 0
-    INCANDESCENT = 1
+    TUNGSTEN = 1
     FLUORESCENT = 2
-    WARM_FLUORESCENT = 3
+    INDOOR = 3
     DAYLIGHT = 4
-    CLOUDY_DAYLIGHT = 5
-    TWILIGHT = 6
-    SHADE = 7
+    CLOUDY = 5
+    CUSTOM = 6

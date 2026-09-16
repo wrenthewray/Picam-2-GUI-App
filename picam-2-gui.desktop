@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Picam 2 GUI
+Comment=Start the Picam 2 camera interface
+Exec=__APP_DIR__/launcher.sh
+Terminal=false
+Type=Application
+Categories=Application;Development;
+StartupNotify=true

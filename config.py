@@ -1,6 +1,4 @@
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QStackedLayout, QComboBox
-
-from constants import CameraMode, SixteenNineResolution
+from constants import CameraMode, SixteenNineResolution, WhiteBalanceMode, AspectRatio
 from preferences import Prefs
 from picamera2 import Picamera2
 from libcamera import controls, ColorSpace
@@ -9,30 +7,42 @@ import pickle
 
 def change_camera_config(picam2: Picamera2, mode:CameraMode, prefs: Prefs):
     picam2.stop()
+    preview_size = (640,480)
     if mode == CameraMode.VIDEO:
+        if(prefs.video_aspect_ratio == AspectRatio.ONE_BY_ONE):
+            preview_size = (480,480)
+        elif(prefs.video_aspect_ratio == AspectRatio.SIXTEEN_BY_NINE):
+            preview_size = (848,480)
         picam2.configure(picam2.create_video_configuration(
             buffer_count=8, 
             main={"size": prefs.video_resolution}, 
-            lores={"size": (640,480)},
+            lores={"size": preview_size },
             controls={"FrameRate": prefs.video_frame_rate}, 
             display="lores",
             encode="main"
         ))
     elif mode == CameraMode.STILL:
+        if(prefs.still_aspect_ratio == AspectRatio.ONE_BY_ONE):
+            preview_size = (480,480)
+        elif(prefs.still_aspect_ratio == AspectRatio.SIXTEEN_BY_NINE):
+            preview_size = (848,480)
         picam2.configure(picam2.create_preview_configuration(
             buffer_count=4, 
-            main={"size": (640,480)}, 
+            main={"size": preview_size},
             controls={"FrameRate": prefs.preview_frame_rate}
         ))
     picam2.start()
 
-def change_layout(stacked_layout : QStackedLayout, index: int):
+def change_layout(stacked_layout, index: int):
     stacked_layout.setCurrentIndex(index)
 
 def change_controls(picam2: Picamera2, prefs: Prefs):
     picam2.stop()
     picam2.set_controls({
         "FrameRate": prefs.video_frame_rate if prefs.camera_mode == CameraMode.VIDEO else prefs.preview_frame_rate,
+        "NoiseReductionMode": controls.draft.NoiseReductionModeEnum.Off,
+        "AwbEnable": prefs.auto_white_balance,
+        "AwbMode": int(prefs.white_balance_mode.value)
     })
     picam2.start()
 
@@ -44,6 +54,8 @@ def change_prefs(
     video_frame_rate: int = None,
     video_aspect_ratio: int = None,
     video_resolution: tuple = None,
+    auto_white_balance: bool = None,
+    white_balance_mode: WhiteBalanceMode = None,
     camera_mode: CameraMode = None,
     audio_mode: bool = None, 
     bitrate: int = None,
@@ -64,6 +76,10 @@ def change_prefs(
         prefs.video_aspect_ratio = video_aspect_ratio
     if video_resolution is not None:    
         prefs.video_resolution = video_resolution
+    if auto_white_balance is not None:
+        prefs.auto_white_balance = auto_white_balance
+    if white_balance_mode is not None:
+        prefs.white_balance_mode = white_balance_mode
     if camera_mode is not None:
         prefs.camera_mode = camera_mode
     if audio_mode is not None:
