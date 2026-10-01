@@ -32,6 +32,7 @@ def change_camera_config(picam2: Picamera2, mode:CameraMode, prefs: Prefs):
             controls={"FrameRate": prefs.preview_frame_rate}
         ))
     picam2.start()
+    change_autofocus_controls(picam2, prefs)
 
 def change_layout(stacked_layout, index: int):
     stacked_layout.setCurrentIndex(index)
@@ -45,6 +46,23 @@ def change_controls(picam2: Picamera2, prefs: Prefs):
         "AwbMode": int(prefs.white_balance_mode.value)
     })
     picam2.start()
+    change_autofocus_controls(picam2, prefs)
+
+def change_autofocus_controls(picam2: Picamera2, prefs: Prefs):
+    available_controls = picam2.camera_controls
+    autofocus_controls = {}
+    if "AfMode" in available_controls:
+        autofocus_controls["AfMode"] = (
+            controls.AfModeEnum.Continuous
+            if prefs.autofocus_enabled else controls.AfModeEnum.Manual
+        )
+    if "AfSpeed" in available_controls:
+        autofocus_controls["AfSpeed"] = (
+            controls.AfSpeedEnum.Fast
+            if prefs.autofocus_speed == 1 else controls.AfSpeedEnum.Normal
+        )
+    if autofocus_controls:
+        picam2.set_controls(autofocus_controls)
 
 def change_prefs(
     prefs: Prefs, 
@@ -55,6 +73,8 @@ def change_prefs(
     video_aspect_ratio: int = None,
     video_resolution: tuple = None,
     auto_white_balance: bool = None,
+    autofocus_enabled: bool = None,
+    autofocus_speed: int = None,
     white_balance_mode: WhiteBalanceMode = None,
     camera_mode: CameraMode = None,
     audio_mode: bool = None, 
@@ -78,6 +98,10 @@ def change_prefs(
         prefs.video_resolution = video_resolution
     if auto_white_balance is not None:
         prefs.auto_white_balance = auto_white_balance
+    if autofocus_enabled is not None:
+        prefs.autofocus_enabled = autofocus_enabled
+    if autofocus_speed is not None:
+        prefs.autofocus_speed = autofocus_speed
     if white_balance_mode is not None:
         prefs.white_balance_mode = white_balance_mode
     if camera_mode is not None:

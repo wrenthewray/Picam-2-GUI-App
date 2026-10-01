@@ -6,7 +6,7 @@ from datetime import datetime
 from PyQt5 import QtCore
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import (
-    QApplication, QComboBox, QFileDialog, QHBoxLayout, QLabel, QMainWindow,
+    QApplication, QCheckBox, QComboBox, QFileDialog, QHBoxLayout, QLabel, QMainWindow,
     QMenu, QMenuBar, QPushButton, QSizePolicy, QStackedLayout, QStackedWidget,
     QTabWidget, QToolBar, QVBoxLayout, QWidget, QAction, QDockWidget,
 )
@@ -17,11 +17,15 @@ from picamera2.outputs import FfmpegOutput
 from picamera2.previews.qt import QGlPicamera2
 
 try:
-    from INA219 import INA219
+    from ups import UPS
 except ImportError:
-    INA219 = None
+    UPS = None
 
 from config import change_camera_config, change_controls, change_layout, change_prefs
+from config import (
+    change_autofocus_controls, change_camera_config, change_controls,
+    change_layout, change_prefs,
+)
 from constants import (
     AspectRatio, BitRate, CameraMode, FourThreeResolution, FrameRate,
     OneOneResolution, SixteenNineResolution, WhiteBalanceMode,
@@ -67,6 +71,7 @@ class CameraApplication:
 
         self.picam2.start()
         change_camera_config(self.picam2, self.prefs.camera_mode, self.prefs)
+        self.update_autofocus_availability()
         self.window.showFullScreen()
 
     @staticmethod
@@ -91,10 +96,10 @@ class CameraApplication:
 
     @staticmethod
     def create_battery_sensor():
-        if INA219 is None:
+        if UPS is None:
             return None
         try:
-            return INA219(i2c_bus=1, addr=0x43)
+            return UPS()
         except Exception:
             return None
 
@@ -103,8 +108,7 @@ class CameraApplication:
             self.battery_label.setText("Battery: --%")
             return
         try:
-            voltage = self.battery_sensor.getBusVoltage_V()
-            percentage = round((voltage - 3.0) / 1.2 * 100)
+            percentage = self.battery_sensor.get_battery_percentage()
             percentage = max(0, min(100, percentage))
             self.battery_label.setText(f"Battery: {percentage}%")
         except Exception:
@@ -172,6 +176,7 @@ class CameraApplication:
         change_prefs(self.prefs, camera_mode=mode)
         change_camera_config(self.picam2, mode, self.prefs)
         change_layout(self.stacked_layout, mode.value)
+        self.update_autofocus_availability()
         self.picam2.start()
 
     def show_time(self):
@@ -201,6 +206,27 @@ class CameraApplication:
     def on_select_white_balance_mode(self, white_balance):
         change_prefs(self.prefs, white_balance_mode=white_balance)
         change_controls(self.picam2, self.prefs)
+
+    def on_toggle_autofocus(self, enabled):
+        change_prefs(self.prefs, autofocus_enabled=enabled)
+        change_autofocus_controls(self.picam2, self.prefs)
+        self.update_autofocus_availability()
+
+    def on_select_autofocus_speed(self, speed):
+        change_prefs(self.prefs, autofocus_speed=speed)
+        change_autofocus_controls(self.picam2, self.prefs)
+
+    def update_autofocus_availability(self):
+        try:
+            available_controls = self.picam2.camera_controls
+        except Exception:
+            available_controls = {}
+        self.autofocus_supported = "AfMode" in available_controls
+        speed_supported = "AfSpeed" in available_controls
+        self.autofocus_checkbox.setEnabled(self.autofocus_supported)
+        self.autofocus_speed_combo.setEnabled(
+            self.autofocus_supported and speed_supported and self.prefs.autofocus_enabled
+        )
 
     def on_select_video_directory(self):
         directory = self.file_dialog.getExistingDirectory(
@@ -288,6 +314,7 @@ class CameraApplication:
         self.build_toolbar()
         self.build_capture_controls()
         self.build_video_options()
+        self.build_autofocus_options()
 
         self.window.setCentralWidget(self.picam_widget)
         self.window.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.capture_dock_widget)
@@ -371,7 +398,7 @@ class CameraApplication:
         options_layout = QVBoxLayout()
         self.add_framerate_control(options_layout, "Preview Frame Rate:", self.prefs.preview_frame_rate, self.on_select_preview_framerate)
         self.add_framerate_control(options_layout, "Video Frame Rate:", self.prefs.video_frame_rate, self.on_select_video_framerate)
-        self.add_combo_control(options_layout, "Bitrate:", ("10.24 Mbps", "20.48 Mbps", "45 Mbps", "60 Mbps"), self.bitrate_list.index(self.prefs.bitrate), lambda index: change_prefs(self.prefs, bitrate=self.bitrate_list[index]))
+        self.add_combo_control(options_layout, "Bitrate:", ("1.28 Mbps", "2.56 Mbps", "5.12 Mbps", "10.24 Mbps", "20.48 Mbps", "45 Mbps", "60 Mbps"), self.bitrate_list.index(self.prefs.bitrate), lambda index: change_prefs(self.prefs, bitrate=self.bitrate_list[index]))
         self.add_aspect_control(options_layout, "Video Aspect Ratio:", self.prefs.video_aspect_ratio, self.on_select_video_aspect_ratio)
         self.video_resolution_stacked_layout = self.add_resolution_control(options_layout, "Video Resolution:", self.prefs.video_aspect_ratio, self.prefs.video_resolution, self.on_select_video_resolution)
         self.add_aspect_control(options_layout, "Still Aspect Ratio:", self.prefs.still_aspect_ratio, self.on_select_still_aspect_ratio)
@@ -379,6 +406,25 @@ class CameraApplication:
         video_window = QWidget()
         video_window.setLayout(options_layout)
         self.options_tab_window.addTab(video_window, "Video")
+
+    def build_autofocus_options(self):
+        autofocus_layout = QVBoxLayout()
+        self.autofocus_checkbox = QCheckBox("Enable autofocus")
+        self.autofocus_checkbox.setChecked(self.prefs.autofocus_enabled)
+        self.autofocus_checkbox.toggled.connect(self.on_toggle_autofocus)
+        autofocus_layout.addWidget(self.autofocus_checkbox)
+
+        speed_index = self.prefs.autofocus_speed
+        if speed_index not in (0, 1):
+            speed_index = 0
+        self.autofocus_speed_combo = self.add_combo_control(
+            autofocus_layout, "Autofocus speed:", ("Normal", "Fast"),
+            speed_index, self.on_select_autofocus_speed,
+        )
+        autofocus_window = QWidget()
+        autofocus_window.setLayout(autofocus_layout)
+        self.options_tab_window.addTab(autofocus_window, "Autofocus")
+        self.autofocus_speed_combo.setEnabled(False)
 
     def add_framerate_control(self, layout, label, value, handler):
         self.add_combo_control(layout, label, ("12 FPS", "24 FPS", "25 FPS", "30 FPS"), self.frame_rate_list.index(value), lambda index: handler(self.frame_rate_list[index]))
