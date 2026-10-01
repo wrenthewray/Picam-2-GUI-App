@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 import pickle
+import os
 from datetime import datetime
 
 from PyQt5 import QtCore
@@ -8,7 +9,7 @@ from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QFileDialog, QHBoxLayout, QLabel, QMainWindow,
     QMenu, QMenuBar, QPushButton, QSizePolicy, QStackedLayout, QStackedWidget,
-    QTabWidget, QToolBar, QVBoxLayout, QWidget, QAction, QDockWidget,
+    QTabWidget, QToolBar, QVBoxLayout, QWidget, QAction, QDockWidget, QGroupBox,
 )
 
 from picamera2 import Picamera2
@@ -45,8 +46,14 @@ class CameraApplication:
         self.sixteen_nine_resolutions = self.tuple_values(SixteenNineResolution)
         self.four_three_resolutions = self.tuple_values(FourThreeResolution)
         self.one_one_resolutions = self.tuple_values(OneOneResolution)
+        self.tuning_directory = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "lens-tuning-files"
+        )
+        self.tuning_files = self.get_tuning_files()
+        if self.prefs.tuning_file not in self.tuning_files:
+            self.prefs.tuning_file = self.tuning_files[0] if self.tuning_files else None
 
-        self.picam2 = Picamera2()
+        self.picam2 = Picamera2(tuning=self.load_tuning(self.prefs.tuning_file))
         self.build_interface()
         self.picam2.post_callback = self.post_callback
         self.qpicamera2 = QGlPicamera2(self.picam2, width=800, height=480, keep_ar=True)
@@ -93,6 +100,48 @@ class CameraApplication:
             if isinstance(value, tuple) and len(value) == 2
             and all(isinstance(item, int) for item in value)
         ]
+
+    def get_tuning_files(self):
+        if not os.path.isdir(self.tuning_directory):
+            return []
+        return sorted(
+            filename for filename in os.listdir(self.tuning_directory)
+            if filename.lower().endswith(".json")
+            and os.path.isfile(os.path.join(self.tuning_directory, filename))
+        )
+
+    def load_tuning(self, filename):
+        if filename is None:
+            return None
+        return Picamera2.load_tuning_file(filename, dir=self.tuning_directory)
+
+    def on_select_tuning_file(self, index):
+        if index < 0:
+            return
+        filename = self.tuning_files[index]
+        if filename == self.prefs.tuning_file:
+            return
+
+        tuning = self.load_tuning(filename)
+        change_prefs(self.prefs, tuning_file=filename)
+        showing_settings = self.picam_stacked_layout.currentWidget() is self.options_tab_window
+        self.picam2.stop()
+        old_preview = self.qpicamera2
+        self.picam_stacked_layout.removeWidget(old_preview)
+        old_preview.deleteLater()
+        self.picam2.close()
+
+        self.picam2 = Picamera2(tuning=tuning)
+        self.picam2.post_callback = self.post_callback
+        self.qpicamera2 = QGlPicamera2(self.picam2, width=800, height=480, keep_ar=True)
+        self.qpicamera2.done_signal.connect(self.capture_done)
+        self.picam_stacked_layout.insertWidget(0, self.qpicamera2)
+        self.picam2.start()
+        change_camera_config(self.picam2, self.prefs.camera_mode, self.prefs)
+        change_controls(self.picam2, self.prefs)
+        self.update_autofocus_availability()
+        if showing_settings:
+            self.picam_stacked_layout.setCurrentWidget(self.options_tab_window)
 
     @staticmethod
     def create_battery_sensor():
@@ -421,6 +470,18 @@ class CameraApplication:
             autofocus_layout, "Autofocus speed:", ("Normal", "Fast"),
             speed_index, self.on_select_autofocus_speed,
         )
+        tuning_group = QGroupBox("Lens tuning")
+        tuning_layout = QVBoxLayout(tuning_group)
+        tuning_index = (
+            self.tuning_files.index(self.prefs.tuning_file)
+            if self.prefs.tuning_file in self.tuning_files else -1
+        )
+        self.tuning_file_combo = self.add_combo_control(
+            tuning_layout, "Tuning file:", self.tuning_files,
+            tuning_index, self.on_select_tuning_file,
+        )
+        self.tuning_file_combo.setEnabled(bool(self.tuning_files))
+        autofocus_layout.addWidget(tuning_group)
         autofocus_window = QWidget()
         autofocus_window.setLayout(autofocus_layout)
         self.options_tab_window.addTab(autofocus_window, "Autofocus")

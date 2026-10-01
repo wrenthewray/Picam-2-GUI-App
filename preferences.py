@@ -15,6 +15,7 @@ class Prefs():
     white_balance_mode = WhiteBalanceMode.AUTO
     autofocus_enabled = False
     autofocus_speed = 0
+    tuning_file = None
     camera_mode = CameraMode.VIDEO # Default to video mode
     
     audio_mode = False

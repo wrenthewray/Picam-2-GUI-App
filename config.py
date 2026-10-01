@@ -83,7 +83,8 @@ def change_prefs(
     contrast: int = None, 
     saturation: int = None, 
     still_save_directory: str = None, 
-    video_save_directory: str = None):
+    video_save_directory: str = None,
+    tuning_file: str = None):
     if preview_frame_rate is not None:
         prefs.preview_frame_rate = preview_frame_rate
     if still_aspect_ratio is not None:
@@ -120,6 +121,8 @@ def change_prefs(
         prefs.still_save_directory = still_save_directory
     if video_save_directory is not None:
         prefs.video_save_directory = video_save_directory
+    if tuning_file is not None:
+        prefs.tuning_file = tuning_file
     try:
         with open("prefs.pkl", "wb") as f:
             pickle.dump(prefs, f)
