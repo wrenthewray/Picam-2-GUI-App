@@ -78,6 +78,9 @@ def change_prefs(
     white_balance_mode: WhiteBalanceMode = None,
     camera_mode: CameraMode = None,
     audio_mode: bool = None, 
+    audio_recording_device: str = None,
+    audio_playback_device: str = None,
+    playback_volume: int = None,
     bitrate: int = None,
     brightness: int = None, 
     contrast: int = None, 
@@ -109,6 +112,12 @@ def change_prefs(
         prefs.camera_mode = camera_mode
     if audio_mode is not None:
         prefs.audio_mode = audio_mode
+    if audio_recording_device is not None:
+        prefs.audio_recording_device = audio_recording_device
+    if audio_playback_device is not None:
+        prefs.audio_playback_device = audio_playback_device
+    if playback_volume is not None:
+        prefs.playback_volume = playback_volume
     if bitrate is not None:
         prefs.bitrate = bitrate
     if brightness is not None:

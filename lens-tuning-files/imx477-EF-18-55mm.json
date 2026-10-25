@@ -768,7 +768,7 @@
                 {
                     "normal":
                     {
-                        "step_coarse": 0.25,
+                        "step_coarse": 0.1,
                         "step_fine": 0.05,
                         "contrast_ratio": 0.75,
                         "retrigger_ratio": 0.8,

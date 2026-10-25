@@ -19,6 +19,9 @@ class Prefs():
     camera_mode = CameraMode.VIDEO # Default to video mode
     
     audio_mode = False
+    audio_recording_device = "default"
+    audio_playback_device = "default"
+    playback_volume = 80
     bitrate = BitRate.TWENTY_POINT_FOUR_MBPS
     brightness = 0
     contrast = 0
